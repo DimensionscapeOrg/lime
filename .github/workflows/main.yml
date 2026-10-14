@@ -103,7 +103,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Build HelloWorld sample
         run: |
@@ -193,7 +193,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Build HelloWorld sample
         run: |
@@ -326,7 +326,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       # - name: Build HelloWorld sample
       #   run: |
@@ -441,7 +441,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       # - name: Build HelloWorld sample
       #   run: |
@@ -558,7 +558,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Build HelloWorld sample
         run: |
@@ -643,7 +643,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Build SimpleImage sample
         run: |
@@ -729,7 +729,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Build HelloWorld sample
         run: |
@@ -798,7 +798,7 @@ jobs:
 
       - name: Install samples
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       # - name: Build HelloWorld sample
       #   run: |
@@ -987,7 +987,7 @@ jobs:
         run: |
           haxelib install format --quiet
           haxelib install hxp --quiet
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Prepare Lime
         run: |
@@ -1044,7 +1044,7 @@ jobs:
           haxelib install ../hxcpp-4.3.53.zip --quiet
           haxelib install format --quiet
           haxelib install hxp --quiet
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - name: Prepare Lime
         run: |
@@ -1095,7 +1095,7 @@ jobs:
 
       - name: Install Haxe dependencies
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - uses: actions/download-artifact@v8
         with:
@@ -1150,7 +1150,7 @@ jobs:
 
       - name: Install Haxe dependencies
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - uses: actions/download-artifact@v8
         with:
@@ -1203,7 +1203,7 @@ jobs:
       - name: Install Haxe dependencies
         run: |
           haxelib install genes --quiet
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - uses: actions/download-artifact@v8
         with:
@@ -1283,7 +1283,7 @@ jobs:
 
       - name: Install Haxe dependencies
         run: |
-          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+          haxelib git lime-samples https://github.com/DimensionscapeOrg/lime-samples video-render-modes --quiet
 
       - uses: actions/download-artifact@v8
         with:
