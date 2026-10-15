@@ -11,6 +11,79 @@ import haxe.io.BytesInput;
 import lime._internal.backend.native.NativeMenu;
 #end
 
+#if (cpp && mac)
+@:cppFileCode('#include <objc/runtime.h>
+#include <objc/message.h>
+
+// Asks AppKit directly, through the Objective-C runtime, what a click on the menu bar does
+
+static id LimeTestSend (id target, const char* selector) {
+	return ((id (*) (id, SEL)) objc_msgSend) (target, sel_registerName (selector));
+}
+
+static id LimeTestApp () {
+	return LimeTestSend ((id) objc_getClass ("NSApplication"), "sharedApplication");
+}
+
+static long LimeTestCount (id menu) {
+	return ((long (*) (id, SEL)) objc_msgSend) (menu, sel_registerName ("numberOfItems"));
+}
+
+static id LimeTestItem (id menu, long index) {
+	return ((id (*) (id, SEL, long)) objc_msgSend) (menu, sel_registerName ("itemAtIndex:"), index);
+}
+
+// Chooses the item of the application menu that carries action, as a click on it
+// does, and returns its tag, or -1 when there is no such item
+static int LimeTestChooseApplicationMenuItem (const char* action) {
+	id mainMenu = LimeTestSend (LimeTestApp (), "mainMenu");
+	if (!mainMenu || LimeTestCount (mainMenu) == 0) return -1;
+	id appMenu = LimeTestSend (LimeTestItem (mainMenu, 0), "submenu");
+	if (!appMenu) return -1;
+	id name = ((id (*) (id, SEL, const char*)) objc_msgSend) ((id) objc_getClass ("NSString"), sel_registerName ("stringWithUTF8String:"), action);
+	for (long i = 0; i < LimeTestCount (appMenu); i++) {
+		id item = LimeTestItem (appMenu, i);
+		id represented = LimeTestSend (item, "representedObject");
+		if (represented && ((bool (*) (id, SEL, id)) objc_msgSend) (represented, sel_registerName ("isEqual:"), name)) {
+			int tag = (int) ((long (*) (id, SEL)) objc_msgSend) (item, sel_registerName ("tag"));
+			((void (*) (id, SEL, long)) objc_msgSend) (appMenu, sel_registerName ("performActionForItemAtIndex:"), i);
+			return tag;
+		}
+	}
+	return -1;
+}
+
+// Delivers AppKit events for a while, as the application loop does, which hiding
+// and showing the application need to complete
+static void LimeTestPump (double seconds) {
+	id app = LimeTestApp ();
+	id mode = ((id (*) (id, SEL, const char*)) objc_msgSend) ((id) objc_getClass ("NSString"), sel_registerName ("stringWithUTF8String:"), "kCFRunLoopDefaultMode");
+	id until = ((id (*) (id, SEL, double)) objc_msgSend) ((id) objc_getClass ("NSDate"), sel_registerName ("dateWithTimeIntervalSinceNow:"), seconds);
+	for (int i = 0; i < 100; i++) {
+		id event = ((id (*) (id, SEL, unsigned long, id, id, bool)) objc_msgSend) (app, sel_registerName ("nextEventMatchingMask:untilDate:inMode:dequeue:"), ~0UL, until, mode, true);
+		if (!event) break;
+		((void (*) (id, SEL, id)) objc_msgSend) (app, sel_registerName ("sendEvent:"), event);
+	}
+}
+
+static bool LimeTestIsHidden () {
+	return ((bool (*) (id, SEL)) objc_msgSend) (LimeTestApp (), sel_registerName ("isHidden"));
+}
+
+// Waits up to two seconds for the application to be hidden, or shown
+static bool LimeTestWaitForHidden (bool hidden) {
+	for (int i = 0; i < 40 && LimeTestIsHidden () != hidden; i++) {
+		LimeTestPump (0.05);
+	}
+	return LimeTestIsHidden () == hidden;
+}
+
+static void LimeTestUnhide () {
+	((void (*) (id, SEL, id)) objc_msgSend) (LimeTestApp (), sel_registerName ("unhide:"), nil);
+}')
+// Lime is loaded as a library, so the tests link the Objective-C runtime themselves
+@:buildXml('<target id="haxe"><lib name="-lobjc" /></target>')
+#end
 class MenuTest extends Test
 {
 	public function new()
@@ -324,6 +397,46 @@ class MenuTest extends Test
 		Assert.notNull(restored, "setting null restores the default");
 		if (restored != null) Assert.notEquals("File", restored.getItemAt(restored.numItems - 1).label);
 	}
+
+	#if cpp
+	public function testMacChoosingHideHidesTheApplication():Void
+	{
+		var application = lime.app.Application.current;
+		var menu = application.menu;
+		Assert.notNull(menu, "the menu starts as the default menu bar");
+		if (menu == null) return;
+
+		// With a menu of the application's own, the menu bar is Lime's
+		var file = new Menu();
+		file.addItem(new MenuItem("Open"));
+		menu.addSubmenu(file, "File");
+
+		var selected = 0;
+		var hide = findAction(menu.getItemAt(0).submenu, "hide:");
+		if (hide != null) hide.onSelect.add(function() selected++);
+
+		// Hide is chosen in the menu bar that macOS shows
+		var tag:Int = untyped __cpp__('LimeTestChooseApplicationMenuItem ("hide:")');
+		var hidden:Bool = untyped __cpp__('LimeTestWaitForHidden (true)');
+		untyped __cpp__('LimeTestUnhide ()');
+		var shown:Bool = untyped __cpp__('LimeTestWaitForHidden (false)');
+
+		// Lime is told of it as of any other item, with the item's tag
+		var backend = @:privateAccess application.__backend;
+		var info = @:privateAccess backend.menuEventInfo;
+		info.type = cast 0;
+		info.windowID = 0;
+		info.id = tag;
+		@:privateAccess backend.handleMenuEvent();
+
+		application.menu = null;
+
+		Assert.isTrue(tag > 0, "the menu bar has Hide");
+		Assert.isTrue(hidden, "choosing Hide hides the application");
+		Assert.isTrue(shown, "the application is shown again");
+		Assert.equals(1, selected, "the Hide item of the Lime menu is selected");
+	}
+	#end
 
 	private static function findAction(menu:Menu, action:String):MenuItem
 	{
