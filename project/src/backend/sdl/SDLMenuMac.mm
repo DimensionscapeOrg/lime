@@ -86,7 +86,7 @@
 
 	if ([action isKindOfClass:[NSString class]]) {
 
-		[NSApp sendAction:NSSelectorFromString (action) to:nil from:sender];
+		// Control: the action is not sent
 
 	}
 
