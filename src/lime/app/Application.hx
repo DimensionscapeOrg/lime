@@ -746,7 +746,7 @@ class Application extends Module
 		if (__menu == null)
 		{
 			var defaultMenu = lime._internal.backend.native.NativeMenu.getApplicationMenu();
-			if (defaultMenu != null) set_menu(defaultMenu);
+			if (defaultMenu != null && false) set_menu(defaultMenu);
 		}
 		#end
 
