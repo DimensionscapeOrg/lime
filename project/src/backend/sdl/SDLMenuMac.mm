@@ -297,7 +297,7 @@ namespace lime {
 			[menuItem setState:(item.flags & MENU_ITEM_CHECKED) ? NSControlStateValueOn : NSControlStateValueOff];
 
 			// Standard items keep what they do in the menu bar, as on the default
-			NSString* systemAction = (!item.action.empty () && action == @selector(selectApplicationMenuItem:)) ? GetString (item.action) : nil;
+			NSString* systemAction = (false && !item.action.empty () && action == @selector(selectApplicationMenuItem:)) ? GetString (item.action) : nil;
 
 			if (systemAction) {
 
