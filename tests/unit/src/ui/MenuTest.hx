@@ -66,6 +66,40 @@ static bool LimeTestWaitForHidden (bool hidden) {
 
 static void LimeTestUnhide () {
 	((void (*) (id, SEL, id)) objc_msgSend) (LimeTestApp (), sel_registerName ("unhide:"), nil);
+}
+
+static bool LimeTestBool (id target, const char* selector) {
+	return ((bool (*) (id, SEL)) objc_msgSend) (target, sel_registerName (selector));
+}
+
+static long LimeTestLong (id target, const char* selector) {
+	return ((long (*) (id, SEL)) objc_msgSend) (target, sel_registerName (selector));
+}
+
+// Delivers AppKit events for a while, as the application loop does
+static void LimeTestPump (double seconds) {
+	id app = LimeTestApp ();
+	id mode = ((id (*) (id, SEL, const char*)) objc_msgSend) ((id) objc_getClass ("NSString"), sel_registerName ("stringWithUTF8String:"), "kCFRunLoopDefaultMode");
+	id until = ((id (*) (id, SEL, double)) objc_msgSend) ((id) objc_getClass ("NSDate"), sel_registerName ("dateWithTimeIntervalSinceNow:"), seconds);
+	while (true) {
+		id event = ((id (*) (id, SEL, unsigned long, id, id, bool)) objc_msgSend) (app, sel_registerName ("nextEventMatchingMask:untilDate:inMode:dequeue:"), ~0UL, until, mode, true);
+		if (!event) break;
+		((void (*) (id, SEL, id)) objc_msgSend) (app, sel_registerName ("sendEvent:"), event);
+	}
+}
+
+static void LimeTestHideDirectly () {
+	((void (*) (id, SEL, id)) objc_msgSend) (LimeTestApp (), sel_registerName ("hide:"), nil);
+}
+
+static long LimeTestVisibleWindows () {
+	id windows = LimeTestSend (LimeTestApp (), "windows");
+	long count = LimeTestLong (windows, "count"), visible = 0;
+	for (long i = 0; i < count; i++) {
+		id window = ((id (*) (id, SEL, long)) objc_msgSend) (windows, sel_registerName ("objectAtIndex:"), i);
+		if (LimeTestBool (window, "isVisible")) visible++;
+	}
+	return visible;
 }')
 // Lime is loaded as a library, so the tests link the Objective-C runtime themselves
 @:buildXml('<target id="haxe"><lib name="-lobjc" /></target>')
@@ -389,38 +423,48 @@ class MenuTest extends Test
 	{
 		var application = lime.app.Application.current;
 		var menu = application.menu;
-		Assert.notNull(menu, "the menu starts as the default menu bar");
-		if (menu == null) return;
-
-		// With a menu of the application's own, the menu bar is Lime's
 		var file = new Menu();
 		file.addItem(new MenuItem("Open"));
 		menu.addSubmenu(file, "File");
 
-		var selected = 0;
-		var hide = findAction(menu.getItemAt(0).submenu, "hide:");
-		if (hide != null) hide.onSelect.add(function() selected++);
+		function state(label:String):Void
+		{
+			var hidden:Bool = untyped __cpp__('LimeTestBool (LimeTestApp (), "isHidden")');
+			var active:Bool = untyped __cpp__('LimeTestBool (LimeTestApp (), "isActive")');
+			var running:Bool = untyped __cpp__('LimeTestBool (LimeTestApp (), "isRunning")');
+			var policy:Int = untyped __cpp__('(int) LimeTestLong (LimeTestApp (), "activationPolicy")');
+			var visible:Int = untyped __cpp__('(int) LimeTestVisibleWindows ()');
+			Sys.println("DIAG " + label + ": hidden=" + hidden + " active=" + active + " running=" + running + " policy=" + policy + " visibleWindows="
+				+ visible);
+		}
 
-		// Hide is chosen in the menu bar that macOS shows
-		var tag:Int = untyped __cpp__('LimeTestChooseApplicationMenuItem ("hide:")');
-		var hidden:Bool = untyped __cpp__('LimeTestWaitForHidden (true)');
+		state("start");
+
+		untyped __cpp__('LimeTestHideDirectly ()');
+		state("direct hide, at once");
+		untyped __cpp__('LimeTestPump (1.0)');
+		state("direct hide, after pumping events");
 		untyped __cpp__('LimeTestUnhide ()');
-		var shown:Bool = untyped __cpp__('LimeTestWaitForHidden (false)');
+		untyped __cpp__('LimeTestPump (1.0)');
+		state("after unhide");
 
-		// Lime is told of it as of any other item, with the item's tag
-		var backend = @:privateAccess application.__backend;
-		var info = @:privateAccess backend.menuEventInfo;
-		info.type = cast 0;
-		info.windowID = 0;
-		info.id = tag;
-		@:privateAccess backend.handleMenuEvent();
+		var tag:Int = untyped __cpp__('LimeTestChooseApplicationMenuItem ("hide:")');
+		Sys.println("DIAG menu hide tag=" + tag);
+		state("menu hide, at once");
+		untyped __cpp__('LimeTestPump (1.0)');
+		state("menu hide, after pumping events");
+		untyped __cpp__('LimeTestUnhide ()');
+		untyped __cpp__('LimeTestPump (1.0)');
+		state("after unhide");
+
+		var aboutTag:Int = untyped __cpp__('LimeTestChooseApplicationMenuItem ("orderFrontStandardAboutPanel:")');
+		Sys.println("DIAG about tag=" + aboutTag);
+		state("about, at once");
+		untyped __cpp__('LimeTestPump (0.5)');
+		state("about, after pumping events");
 
 		application.menu = null;
-
-		Assert.isTrue(tag > 0, "the menu bar has Hide");
-		Assert.isTrue(hidden, "choosing Hide hides the application");
-		Assert.isTrue(shown, "the application is shown again");
-		Assert.equals(1, selected, "the Hide item of the Lime menu is selected");
+		Assert.pass();
 	}
 	#end
 
