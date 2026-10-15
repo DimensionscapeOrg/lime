@@ -10,9 +10,12 @@ namespace lime {
 	// Menu data is written by NativeMenu.hx as little-endian Int32 values:
 	//
 	//   menu := itemCount, item[itemCount]
-	//   item := id, flags, keyCode, keyModifiers, labelLength, label, [menu if flags & MENU_ITEM_SUBMENU]
+	//   item := id, flags, keyCode, keyModifiers, labelLength, label,
+	//           [actionLength, action if flags & MENU_ITEM_ACTION], [menu if flags & MENU_ITEM_SUBMENU]
 	//
 	// Labels are UTF-8, with "&" marking the mnemonic and "&&" for a literal ampersand.
+	// An action names what a standard item of the platform's own menus does, as
+	// "terminate:" for Quit on macOS. GetApplicationMenu writes the same format.
 
 	enum MenuEventKind {
 
@@ -63,6 +66,21 @@ namespace lime {
 			item->label.assign ((const char*)(data + *position), labelLength);
 			*position += labelLength;
 
+			if (item->flags & MENU_ITEM_ACTION) {
+
+				int actionLength;
+
+				if (!ReadInt (data, length, position, &actionLength) || actionLength < 0 || length - *position < actionLength) {
+
+					return false;
+
+				}
+
+				item->action.assign ((const char*)(data + *position), actionLength);
+				*position += actionLength;
+
+			}
+
 			if ((item->flags & MENU_ITEM_SUBMENU) && !ParseItems (data, length, position, &item->submenu, depth + 1)) {
 
 				return false;
@@ -79,6 +97,13 @@ namespace lime {
 	TrayIcon* CreateTrayIcon () {
 
 		return new SDLTrayIcon ();
+
+	}
+
+
+	bool Menu::GetApplicationMenu (std::vector<unsigned char>* data) {
+
+		return SDLMenu::GetApplicationMenu (data);
 
 	}
 
@@ -236,6 +261,15 @@ namespace lime {
 
 
 #ifndef LIME_SDL_MENU_COCOA
+
+	// Only macOS starts with a menu bar of its own
+
+	bool SDLMenu::GetApplicationMenu (std::vector<unsigned char>* data) {
+
+		return false;
+
+	}
+
 
 	// The Dock only exists on macOS
 

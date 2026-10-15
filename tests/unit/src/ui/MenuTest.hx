@@ -242,6 +242,106 @@ class MenuTest extends Test
 		Assert.isNull(NativeMenu.getKeyEquivalentItem(items, KeyCode.S, KeyModifier.CTRL));
 	}
 
+	public function testNativeEncodingKeepsSystemActions():Void
+	{
+		var bar = new Menu();
+		var app = new Menu();
+		var quit = app.addItem(new MenuItem("Quit Tests"));
+		quit.keyEquivalent = KeyCode.Q;
+		quit.keyEquivalentModifiers = KeyModifier.META;
+		@:privateAccess quit.__systemAction = "terminate:";
+		var services = app.addSubmenu(new Menu(), "Services");
+		@:privateAccess services.__systemAction = "services";
+		app.addSeparator();
+		app.addItem(new MenuItem("Own Item"));
+		bar.addSubmenu(app, "Tests");
+
+		var copy = NativeMenu.decode(NativeMenu.encode(bar, []));
+		var copyApp = copy.getItemAt(0).submenu;
+
+		Assert.equals(1, copy.numItems);
+		Assert.equals("Tests", copy.getItemAt(0).label);
+		Assert.equals(4, copyApp.numItems);
+		Assert.equals("Quit Tests", copyApp.getItemAt(0).label);
+		Assert.equals("terminate:", @:privateAccess copyApp.getItemAt(0).__systemAction);
+		Assert.equals(KeyCode.Q, copyApp.getItemAt(0).keyEquivalent);
+		Assert.equals(KeyModifier.META, copyApp.getItemAt(0).keyEquivalentModifiers);
+		Assert.equals("services", @:privateAccess copyApp.getItemAt(1).__systemAction);
+		Assert.notNull(copyApp.getItemAt(1).submenu);
+		Assert.isTrue(copyApp.getItemAt(2).isSeparator);
+		Assert.isNull(@:privateAccess copyApp.getItemAt(3).__systemAction);
+	}
+
+	#if (mac && lime_cffi && !macro)
+	public function testMacMenuStartsWithTheDefaultMenuBar():Void
+	{
+		var menu = lime.app.Application.current.menu;
+		Assert.notNull(menu, "the menu starts as the default menu bar");
+		if (menu == null) return;
+
+		var appMenu = menu.getItemAt(0).submenu;
+		Assert.notNull(appMenu, "the first item has the application menu");
+		if (appMenu == null) return;
+
+		var quit = findAction(appMenu, "terminate:");
+		Assert.notNull(quit, "the application menu has Quit");
+		if (quit != null)
+		{
+			Assert.equals(KeyCode.Q, quit.keyEquivalent);
+			Assert.isTrue(quit.keyEquivalentModifiers.metaKey);
+		}
+
+		Assert.notNull(findAction(appMenu, "hide:"), "the application menu has Hide");
+		Assert.notNull(findAction(appMenu, "services"), "the application menu has Services");
+	}
+
+	public function testMacDefaultItemsSurviveAddingAMenu():Void
+	{
+		var application = lime.app.Application.current;
+		var menu = application.menu;
+		Assert.notNull(menu, "the menu starts as the default menu bar");
+		if (menu == null) return;
+
+		var file = new Menu();
+		file.addItem(new MenuItem("Open"));
+		menu.addSubmenu(file, "File");
+
+		// The menu bar is rebuilt from the Lime menu, and read back from macOS
+		var native = NativeMenu.getApplicationMenu();
+
+		application.menu = null;
+
+		Assert.notNull(native);
+		if (native == null) return;
+
+		Assert.equals("File", native.getItemAt(native.numItems - 1).label);
+		Assert.notNull(findAction(native, "terminate:"), "Quit still quits");
+		Assert.notNull(findAction(native, "hide:"), "Hide still hides");
+		Assert.notNull(findAction(native, "services"), "Services is still the Services menu");
+		Assert.notNull(findAction(native, "windows"), "Window is still the Window menu");
+
+		var restored = application.menu;
+		Assert.notNull(restored, "setting null restores the default");
+		if (restored != null) Assert.notEquals("File", restored.getItemAt(restored.numItems - 1).label);
+	}
+
+	private static function findAction(menu:Menu, action:String):MenuItem
+	{
+		for (item in menu.items)
+		{
+			if (@:privateAccess item.__systemAction == action) return item;
+
+			if (item.submenu != null)
+			{
+				var found = findAction(item.submenu, action);
+				if (found != null) return found;
+			}
+		}
+
+		return null;
+	}
+	#end
+
 	private function assertItem(input:BytesInput, id:Int, flags:Int, keyCode:Int, modifiers:Int, label:String):Void
 	{
 		Assert.equals(id, input.readInt32());

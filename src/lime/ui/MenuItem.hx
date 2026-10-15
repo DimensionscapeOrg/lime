@@ -85,6 +85,10 @@ class MenuItem
 	@:noCompletion private var __mnemonicIndex:Int;
 	@:noCompletion private var __submenu:Menu;
 
+	// What a standard item of the platform's default menu bar does, as
+	// "terminate:" for Quit on macOS, carried out when it is selected
+	@:noCompletion private var __systemAction:String;
+
 	public function new(label:String = "", isSeparator:Bool = false)
 	{
 		__label = label != null ? label : "";

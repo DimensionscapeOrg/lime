@@ -1,6 +1,7 @@
 package lime._internal.backend.native;
 
 import haxe.io.Bytes;
+import haxe.io.BytesInput;
 import haxe.io.BytesOutput;
 import lime.ui.KeyCode;
 import lime.ui.KeyModifier;
@@ -25,17 +26,43 @@ class NativeMenu
 
 		```
 		menu := itemCount, item[itemCount]
-		item := id, flags, keyCode, keyModifiers, labelLength, label, [menu if flags & MENU_ITEM_SUBMENU]
+		item := id, flags, keyCode, keyModifiers, labelLength, label,
+		        [actionLength, action if flags & MENU_ITEM_ACTION], [menu if flags & MENU_ITEM_SUBMENU]
 		```
 
 		Labels are UTF-8, with "&" marking the mnemonic and "&&" for a literal
 		ampersand. Each item is pushed to `items`, so that `id` is its index + 1.
+		An action names what a standard item of the platform's own menu bar does.
 	**/
 	public static function encode(menu:Menu, items:Array<MenuItem>):Bytes
 	{
 		var output = new BytesOutput();
 		writeMenu(output, menu, items);
 		return output.getBytes();
+	}
+
+	/**
+		Reads a menu in the same format, as the platform gives its default menu
+		bar. Labels are taken as they are, without mnemonics.
+	**/
+	public static function decode(bytes:Bytes):Menu
+	{
+		var input = new BytesInput(bytes);
+		input.bigEndian = false;
+		return readMenu(input);
+	}
+
+	/**
+		The platform's own menu bar, as on macOS, or `null` where there is none.
+	**/
+	public static function getApplicationMenu():Menu
+	{
+		#if (!macro && lime_cffi)
+		var bytes:Bytes = NativeCFFI.lime_menu_get_application_menu(Bytes.alloc(0));
+		return (bytes != null && bytes.length > 0) ? decode(bytes) : null;
+		#else
+		return null;
+		#end
 	}
 
 	public static function getItem(items:Array<MenuItem>, id:Int):MenuItem
@@ -118,6 +145,45 @@ class NativeMenu
 		return true;
 	}
 
+	private static function readMenu(input:BytesInput):Menu
+	{
+		var menu = new Menu();
+		var count = input.readInt32();
+
+		for (i in 0...count)
+		{
+			input.readInt32();
+			var flags = input.readInt32();
+			var keyCode = input.readInt32();
+			var keyModifiers = input.readInt32();
+			var label = input.readString(input.readInt32());
+
+			var item = new MenuItem(label, flags & MENU_ITEM_SEPARATOR != 0);
+			item.__enabled = flags & MENU_ITEM_ENABLED != 0;
+			item.__checked = flags & MENU_ITEM_CHECKED != 0;
+
+			if (keyCode != 0)
+			{
+				item.__keyEquivalent = cast keyCode;
+				item.__keyEquivalentModifiers = cast keyModifiers;
+			}
+
+			if (flags & MENU_ITEM_ACTION != 0)
+			{
+				item.__systemAction = input.readString(input.readInt32());
+			}
+
+			if (flags & MENU_ITEM_SUBMENU != 0)
+			{
+				item.submenu = readMenu(input);
+			}
+
+			menu.addItem(item);
+		}
+
+		return menu;
+	}
+
 	private static function writeMenu(output:BytesOutput, menu:Menu, items:Array<MenuItem>):Void
 	{
 		output.writeInt32(menu.__items.length);
@@ -139,6 +205,8 @@ class NativeMenu
 				flags |= MENU_ITEM_SUBMENU;
 			}
 
+			if (item.__systemAction != null) flags |= MENU_ITEM_ACTION;
+
 			var label = Bytes.ofString(getLabel(item));
 
 			output.writeInt32(items.length);
@@ -147,6 +215,13 @@ class NativeMenu
 			output.writeInt32(item.keyEquivalentModifiers);
 			output.writeInt32(label.length);
 			output.write(label);
+
+			if (flags & MENU_ITEM_ACTION != 0)
+			{
+				var action = Bytes.ofString(item.__systemAction);
+				output.writeInt32(action.length);
+				output.write(action);
+			}
 
 			if (flags & MENU_ITEM_SUBMENU != 0)
 			{
@@ -162,4 +237,5 @@ class NativeMenu
 	var MENU_ITEM_CHECKED = 0x02;
 	var MENU_ITEM_SEPARATOR = 0x04;
 	var MENU_ITEM_SUBMENU = 0x08;
+	var MENU_ITEM_ACTION = 0x10;
 }
