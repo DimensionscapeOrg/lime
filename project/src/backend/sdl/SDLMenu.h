@@ -24,7 +24,8 @@ namespace lime {
 		MENU_ITEM_ENABLED = 0x01,
 		MENU_ITEM_CHECKED = 0x02,
 		MENU_ITEM_SEPARATOR = 0x04,
-		MENU_ITEM_SUBMENU = 0x08
+		MENU_ITEM_SUBMENU = 0x08,
+		MENU_ITEM_ACTION = 0x10
 
 	};
 
@@ -36,6 +37,7 @@ namespace lime {
 		int keyCode;
 		int keyModifiers;
 		std::string label;
+		std::string action;
 		std::vector<SDLMenuItem> submenu;
 
 	};
@@ -45,6 +47,7 @@ namespace lime {
 
 		public:
 
+			static bool GetApplicationMenu (std::vector<unsigned char>* data);
 			static bool GetDockMenuSelection (SDL_Event* event, int* id);
 			static bool GetSelection (SDL_Event* event, Uint32* windowID, int* id);
 			static int GetSupport ();

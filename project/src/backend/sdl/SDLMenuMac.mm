@@ -41,6 +41,7 @@
 - (void)selectApplicationMenuItem:(NSMenuItem*)sender;
 - (void)selectDockMenuItem:(NSMenuItem*)sender;
 - (void)selectPopupMenuItem:(NSMenuItem*)sender;
+- (void)selectSystemMenuItem:(NSMenuItem*)sender;
 - (void)selectTrayIconMenuItem:(NSMenuItem*)sender;
 
 @end
@@ -76,6 +77,21 @@
 
 }
 
+- (void)selectSystemMenuItem:(NSMenuItem*)sender {
+
+	// A standard item, such as Quit: Lime hears of it, and AppKit carries it out
+	lime::SDLMenu::PushSelection (0, (int)[sender tag]);
+
+	id action = [sender representedObject];
+
+	if ([action isKindOfClass:[NSString class]]) {
+
+		[NSApp sendAction:NSSelectorFromString (action) to:nil from:sender];
+
+	}
+
+}
+
 - (void)selectTrayIconMenuItem:(NSMenuItem*)sender {
 
 	// Tray icon menu items carry the tray icon ID in the high 32 bits of their tag
@@ -102,6 +118,8 @@ namespace lime {
 
 	static NSMenu* defaultApplicationMenu = nil;
 	static bool defaultApplicationMenuSaved = false;
+	static NSMenu* defaultServicesMenu = nil;
+	static NSMenu* defaultWindowsMenu = nil;
 	static LimeMenuTarget* menuTarget = nil;
 
 
@@ -242,6 +260,11 @@ namespace lime {
 	}
 
 
+	// The menus macOS fills itself, named by the action of the item they belong to
+	static NSString* const SERVICES_MENU = @"services";
+	static NSString* const WINDOWS_MENU = @"windows";
+
+
 	static void AppendMenuItems (NSMenu* menu, const std::vector<SDLMenuItem>& items, SEL action, NSInteger tagBase) {
 
 		for (size_t i = 0; i < items.size (); i++) {
@@ -273,15 +296,190 @@ namespace lime {
 			[menuItem setEnabled:(item.flags & MENU_ITEM_ENABLED) != 0];
 			[menuItem setState:(item.flags & MENU_ITEM_CHECKED) ? NSControlStateValueOn : NSControlStateValueOff];
 
+			// Standard items keep what they do in the menu bar, as on the default
+			NSString* systemAction = (!item.action.empty () && action == @selector(selectApplicationMenuItem:)) ? GetString (item.action) : nil;
+
+			if (systemAction) {
+
+				[menuItem setRepresentedObject:systemAction];
+				if (!hasSubmenu) [menuItem setAction:@selector(selectSystemMenuItem:)];
+
+			}
+
 			if (hasSubmenu) {
 
 				NSMenu* submenu = CreateMenu (title);
 				AppendMenuItems (submenu, item.submenu, action, tagBase);
 				[menuItem setSubmenu:submenu];
 
+				if ([systemAction isEqualToString:SERVICES_MENU]) {
+
+					[NSApp setServicesMenu:submenu];
+
+				} else if ([systemAction isEqualToString:WINDOWS_MENU]) {
+
+					[NSApp setWindowsMenu:submenu];
+
+				}
+
 			}
 
 			[menu addItem:menuItem];
+
+		}
+
+	}
+
+
+	static void WriteInt (std::vector<unsigned char>* data, int value) {
+
+		for (int i = 0; i < 4; i++) data->push_back ((unsigned char)(((Uint32)value >> (i * 8)) & 0xFF));
+
+	}
+
+
+	static void WriteString (std::vector<unsigned char>* data, NSString* text) {
+
+		const char* utf8 = text ? [text UTF8String] : "";
+		int length = (int)strlen (utf8);
+		WriteInt (data, length);
+		data->insert (data->end (), utf8, utf8 + length);
+
+	}
+
+
+	static int GetKeyCode (NSString* keyEquivalent, NSUInteger* modifierMask) {
+
+		if ([keyEquivalent length] == 0) return 0;
+
+		unichar character = [keyEquivalent characterAtIndex:0];
+
+		// An uppercase key equivalent implies Shift
+		if (character >= 'A' && character <= 'Z') {
+
+			*modifierMask |= NSEventModifierFlagShift;
+			return character - 'A' + 'a';
+
+		}
+
+		if (character >= 0x20 && character < 0x7F) return character;
+		if (character >= NSF1FunctionKey && character <= NSF12FunctionKey) return SDLK_F1 + (character - NSF1FunctionKey);
+		if (character >= NSF13FunctionKey && character <= NSF24FunctionKey) return SDLK_F13 + (character - NSF13FunctionKey);
+
+		switch (character) {
+
+			case NSBackspaceCharacter: return SDLK_BACKSPACE;
+			case NSTabCharacter: return SDLK_TAB;
+			case NSCarriageReturnCharacter: return SDLK_RETURN;
+			case 0x1B: return SDLK_ESCAPE;
+			case NSDeleteFunctionKey: return SDLK_DELETE;
+			case NSHomeFunctionKey: return SDLK_HOME;
+			case NSEndFunctionKey: return SDLK_END;
+			case NSPageUpFunctionKey: return SDLK_PAGEUP;
+			case NSPageDownFunctionKey: return SDLK_PAGEDOWN;
+			case NSInsertFunctionKey: return SDLK_INSERT;
+			case NSLeftArrowFunctionKey: return SDLK_LEFT;
+			case NSRightArrowFunctionKey: return SDLK_RIGHT;
+			case NSUpArrowFunctionKey: return SDLK_UP;
+			case NSDownArrowFunctionKey: return SDLK_DOWN;
+			default: return 0;
+
+		}
+
+	}
+
+
+	static int GetKeyModifiers (NSUInteger modifierMask) {
+
+		int keyModifiers = 0;
+
+		if (modifierMask & NSEventModifierFlagCommand) keyModifiers |= KMOD_GUI;
+		if (modifierMask & NSEventModifierFlagShift) keyModifiers |= KMOD_SHIFT;
+		if (modifierMask & NSEventModifierFlagOption) keyModifiers |= KMOD_ALT;
+		if (modifierMask & NSEventModifierFlagControl) keyModifiers |= KMOD_CTRL;
+
+		return keyModifiers;
+
+	}
+
+
+	static void WriteMenu (std::vector<unsigned char>* data, NSMenu* menu) {
+
+		// Window menus also list the open windows, which macOS adds and removes
+		std::vector<NSMenuItem*> items;
+
+		for (NSMenuItem* item in [menu itemArray]) {
+
+			if ([item action] != @selector(makeKeyAndOrderFront:)) items.push_back (item);
+
+		}
+
+		WriteInt (data, (int)items.size ());
+
+		for (NSMenuItem* item : items) {
+
+			NSMenu* submenu = [item hasSubmenu] ? [item submenu] : nil;
+			NSString* action = nil;
+
+			if ([[item representedObject] isKindOfClass:[NSString class]]) {
+
+				action = [item representedObject];
+
+			} else if (submenu && submenu == [NSApp servicesMenu]) {
+
+				action = SERVICES_MENU;
+
+			} else if (submenu && submenu == [NSApp windowsMenu]) {
+
+				action = WINDOWS_MENU;
+
+			} else if (!submenu && [item action] && ([item target] == nil || [item target] == NSApp)) {
+
+				action = NSStringFromSelector ([item action]);
+
+			}
+
+			int flags = 0;
+			if ([item isEnabled]) flags |= MENU_ITEM_ENABLED;
+			if ([item state] == NSControlStateValueOn) flags |= MENU_ITEM_CHECKED;
+			if ([item isSeparatorItem]) flags |= MENU_ITEM_SEPARATOR;
+			if (submenu) flags |= MENU_ITEM_SUBMENU;
+			if (action) flags |= MENU_ITEM_ACTION;
+
+			NSUInteger modifierMask = [item keyEquivalentModifierMask];
+			int keyCode = GetKeyCode ([item keyEquivalent], &modifierMask);
+
+			WriteInt (data, 0);
+			WriteInt (data, flags);
+			WriteInt (data, keyCode);
+			WriteInt (data, keyCode ? GetKeyModifiers (modifierMask) : 0);
+
+			// Titles are written as they are, without mnemonics
+			WriteString (data, [item title]);
+			if (action) WriteString (data, action);
+
+			if (submenu) {
+
+				// macOS fills the Services menu itself
+				if ([action isEqualToString:SERVICES_MENU]) WriteInt (data, 0);
+				else WriteMenu (data, submenu);
+
+			}
+
+		}
+
+	}
+
+
+	bool SDLMenu::GetApplicationMenu (std::vector<unsigned char>* data) {
+
+		@autoreleasepool {
+
+			NSMenu* menu = NSApp ? [NSApp mainMenu] : nil;
+			if (!menu) return false;
+
+			WriteMenu (data, menu);
+			return true;
 
 		}
 
@@ -359,6 +557,8 @@ namespace lime {
 			if (!defaultApplicationMenuSaved) {
 
 				defaultApplicationMenu = LIME_RETAIN ([NSApp mainMenu]);
+				defaultServicesMenu = LIME_RETAIN ([NSApp servicesMenu]);
+				defaultWindowsMenu = LIME_RETAIN ([NSApp windowsMenu]);
 				defaultApplicationMenuSaved = true;
 
 			}
@@ -366,6 +566,8 @@ namespace lime {
 			if (!data || length <= 0) {
 
 				[NSApp setMainMenu:defaultApplicationMenu];
+				if (defaultServicesMenu) [NSApp setServicesMenu:defaultServicesMenu];
+				if (defaultWindowsMenu) [NSApp setWindowsMenu:defaultWindowsMenu];
 				return true;
 
 			}
