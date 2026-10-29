@@ -229,7 +229,7 @@ class NativeMenu
 				flags |= MENU_ITEM_SUBMENU;
 			}
 
-			if (item.__systemAction != null) flags |= MENU_ITEM_ACTION;
+			// control: actions are not written
 
 			var label = Bytes.ofString(getLabel(item));
 
