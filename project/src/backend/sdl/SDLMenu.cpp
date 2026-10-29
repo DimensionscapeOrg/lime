@@ -122,6 +122,14 @@ namespace lime {
 	}
 
 
+	bool Menu::GetApplicationMenu (std::vector<unsigned char>* data) {
+
+		ConfigureDesktop ();
+		return native_desktop::Menu::GetApplicationMenu (data);
+
+	}
+
+
 	int Menu::GetSupport () {
 
 		return SDLMenu::GetSupport ();
