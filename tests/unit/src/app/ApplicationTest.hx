@@ -124,7 +124,8 @@ class ApplicationTest extends Test
 		// Each window event until the count ends is noted with its time, for the failures
 		var eventStart = Timer.stamp();
 		var recording = true;
-		windowEvents = "";
+		// TEMPORARY batch-only diagnostics: every window as Lime sees it
+		windowEvents = " lime windows [" + [for (w in application.windows) w.id + ":" + w.title + (w.hidden ? ":hidden" : "") + (w.minimized ? ":minimized" : "")].join(", ") + "]";
 		var note = function(name:String) if (recording) windowEvents += " " + name + "@" + Math.round((Timer.stamp() - eventStart) * 1000);
 		var onShow = function() note("show");
 		var onHide = function() note("hide");

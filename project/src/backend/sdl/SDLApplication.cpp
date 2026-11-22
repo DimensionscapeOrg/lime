@@ -2011,7 +2011,7 @@ namespace lime
 		bool hidden = (counted > 0 && shown == 0);
 		if (LimeDebugBackgroundRate ()) {
 			printf ("[bgrate] windows=%d counted=%d shown=%d hidden=%d was=%d apply=%d\n", (int)windows.size (), counted, shown, (int)hidden, (int)windowsHidden, (int)apply);
-			for (std::vector<SDLWindow*>::const_iterator it = windows.begin (); it != windows.end (); ++it) if (*it && (*it)->sdlWindow) printf ("[bgrate]   window %u flags=0x%x\n", SDL_GetWindowID ((*it)->sdlWindow), (unsigned)SDL_GetWindowFlags ((*it)->sdlWindow));
+			for (std::vector<SDLWindow*>::const_iterator it = windows.begin (); it != windows.end (); ++it) if (*it && (*it)->sdlWindow) printf ("[bgrate]   window %u flags=0x%x title=%s\n", SDL_GetWindowID ((*it)->sdlWindow), (unsigned)SDL_GetWindowFlags ((*it)->sdlWindow), SDL_GetWindowTitle ((*it)->sdlWindow));
 			fflush (stdout);
 		}
 

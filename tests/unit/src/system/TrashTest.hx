@@ -45,7 +45,15 @@ class TrashTest extends Test
 		System.moveToTrashAsync(missing).onComplete(function(moved)
 		{
 			// Says what came back, as only macOS HashLink gave something other than false here
-			Assert.isFalse(moved, "moveToTrashAsync completed with " + moved + " (" + Type.typeof(moved) + ")");
+			// TEMPORARY batch-only diagnostics: the same path on this thread, and on a thread of its own
+			var here = System.moveToTrash(missing);
+			var onThread:Dynamic = "not tried";
+			#if hl
+			var lock = new sys.thread.Lock();
+			sys.thread.Thread.create(function() { var r = System.moveToTrash(missing); onThread = r; lock.release(); });
+			if (!lock.wait(5)) onThread = "timed out";
+			#end
+			Assert.isFalse(moved, "moveToTrashAsync completed with " + moved + " (" + Type.typeof(moved) + "); on the main thread " + here + ", on a new thread " + onThread);
 			Assert.isTrue(lime.system.ThreadPool.isMainThread(), "the result came on another thread");
 			async.done();
 		}).onError(function(error)
