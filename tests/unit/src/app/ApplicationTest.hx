@@ -151,6 +151,7 @@ class ApplicationTest extends Test
 		var restore = function()
 		{
 			recording = false;
+			#if sys Sys.putEnv("LIME_DEBUG_BACKGROUND_RATE", "0"); #end // TEMPORARY batch-only diagnostics
 			for (window in windows)
 			{
 				window.onShow.remove(onShow);
@@ -168,6 +169,7 @@ class ApplicationTest extends Test
 			backend.configureFrameTiming(application.frameProfile, @:privateAccess application.__frameRate, application.frameOptions);
 		};
 
+		#if sys Sys.putEnv("LIME_DEBUG_BACKGROUND_RATE", "1"); #end // TEMPORARY batch-only diagnostics
 		backend.configureFrameTiming(application.frameProfile, 120, options != null ? options : application.frameOptions);
 		for (window in windows) window.minimized = true;
 

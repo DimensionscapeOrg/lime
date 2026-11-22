@@ -4,6 +4,11 @@
 #include "SDLMenu.h"
 #include "SDLTrayIcon.h"
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+// TEMPORARY batch-only diagnostics for the macOS background frame rate failure
+static bool LimeDebugBackgroundRate () { const char* v = getenv ("LIME_DEBUG_BACKGROUND_RATE"); return v && v[0] == '1'; }
+static int s_debugFrames = 0;
 #include <cmath>
 #include <limits>
 #include <net/LocalSocket.h>
@@ -430,6 +435,7 @@ namespace lime
 		bool samePacing = mainLoopApplied && wasUnthrottled == schedulerUnthrottled && wasSwapPaced == swapPaced &&
 			wasDisplayDriven == useDisplayDrivenFallback && wasBusyWaitOnly == busyWaitOnly;
 		mainLoopApplied = true;
+		if (LimeDebugBackgroundRate ()) { printf ("[bgrate] apply hidden=%d bgRate=%.1f limited=%d period=%.2f unthrottled=%d swapPaced=%d displayDriven=%d busyOnly=%d vsync=%d refresh=%.1f req=%.1f\n", (int)windowsHidden, requestedBackgroundFrameRate, (int)backgroundLimited, framePeriod, (int)schedulerUnthrottled, (int)swapPaced, (int)useDisplayDrivenFallback, (int)busyWaitOnly, (int)realVSyncActive, displayRefreshRate, requestedFrameRate); fflush (stdout); s_debugFrames = 0; }
 
 		if (samePacing && !schedulerUnthrottled && framePeriod > 0.0)
 		{
@@ -572,6 +578,7 @@ namespace lime
 		deltaRemainder = elapsed - rounded;
 		lastUpdate = currentUpdate;
 		dispatchedFrames++;
+		if (s_debugFrames < 8 && LimeDebugBackgroundRate ()) { s_debugFrames++; printf ("[bgrate] frame hidden=%d now=%.2f next=%.2f period=%.2f unthrottled=%d\n", (int)windowsHidden, currentUpdate, nextUpdate, framePeriod, (int)schedulerUnthrottled); fflush (stdout); }
 
 		AdvanceNextUpdate();
 
@@ -2002,6 +2009,11 @@ namespace lime
 		}
 
 		bool hidden = (counted > 0 && shown == 0);
+		if (LimeDebugBackgroundRate ()) {
+			printf ("[bgrate] windows=%d counted=%d shown=%d hidden=%d was=%d apply=%d\n", (int)windows.size (), counted, shown, (int)hidden, (int)windowsHidden, (int)apply);
+			for (std::vector<SDLWindow*>::const_iterator it = windows.begin (); it != windows.end (); ++it) if (*it && (*it)->sdlWindow) printf ("[bgrate]   window %u flags=0x%x\n", SDL_GetWindowID ((*it)->sdlWindow), (unsigned)SDL_GetWindowFlags ((*it)->sdlWindow));
+			fflush (stdout);
+		}
 
 		if (hidden != windowsHidden)
 		{
