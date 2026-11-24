@@ -2,8 +2,8 @@
 # Installs the unit tests in the emulator, runs them and prints what they log
 set -u
 package=org.openfl.lime.tests
-apk=$(find tests/unit/Export -name "*.apk" | grep -i debug | head -1)
-[ -n "$apk" ] || apk=$(find tests/unit/Export -name "*.apk" | head -1)
+apk=$(find tests/unit/bin -name "*.apk" | grep -i debug | head -1)
+[ -n "$apk" ] || apk=$(find tests/unit/bin -name "*.apk" | head -1)
 echo "Installing $apk"
 adb install -r "$apk" || exit 1
 adb logcat -c

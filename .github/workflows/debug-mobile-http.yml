@@ -76,7 +76,7 @@ jobs:
         working-directory: tests/unit
         run: |
           lime build android -debug -emulator -DUTEST_PATTERN="${UTEST_PATTERN}" -nocolor -eval
-          find Export -name "*.apk"
+          find bin -name "*.apk"
 
       - name: Enable KVM
         run: |
@@ -142,7 +142,7 @@ jobs:
         working-directory: tests/unit
         run: |
           lime build ios -simulator -release -DUTEST_PATTERN="${UTEST_PATTERN}" -nocolor -eval
-          find Export -name "*.app" -maxdepth 8
+          find bin -name "*.app" -maxdepth 8
 
       - name: Run the HTTP tests (iOS simulator)
         timeout-minutes: 20
