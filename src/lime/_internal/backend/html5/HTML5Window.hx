@@ -83,6 +83,10 @@ class HTML5Window
 	private var renderType:RenderContextType;
 	private var requestedFullscreen:Bool;
 	private var resizeElement:Bool;
+	// Reports a change in the parent element's size, so that its size needn't be
+	// read on every frame: reading it makes the browser finish any layout first
+	private var resizeObserver:Dynamic;
+	private var resizeObserved:Bool = true;
 	private var scale = 1.0;
 	private var highDPI:Bool;
 	#if !lime_disable_window_scale_change
@@ -219,6 +223,14 @@ class HTML5Window
 
 		updateSize();
 
+		var resizeObserverClass:Dynamic = parent.element != null ? Reflect.field(Browser.window, "ResizeObserver") : null;
+
+		if (resizeObserverClass != null)
+		{
+			resizeObserver = Type.createInstance(resizeObserverClass, [function(_) resizeObserved = true]);
+			resizeObserver.observe(parent.element);
+		}
+
 		#if !lime_disable_window_scale_change
 		// Only after the canvas or div exists, since a scale change calls updateSize().
 		// Without high DPI the scale stays 1, so there is nothing to watch.
@@ -295,6 +307,12 @@ class HTML5Window
 		{
 			menus.close();
 			menus = null;
+		}
+
+		if (resizeObserver != null)
+		{
+			resizeObserver.disconnect();
+			resizeObserver = null;
 		}
 
 		var element = parent.element;
@@ -1776,6 +1794,17 @@ class HTML5Window
 		#end
 	}
 	#end
+
+	// Each frame, the size is read only once the parent element has been resized,
+	// where the browser can say so
+	private function updateSizeEachFrame():Void
+	{
+		if (resizeObserver == null || resizeObserved)
+		{
+			resizeObserved = false;
+			updateSize();
+		}
+	}
 
 	private function updateSize():Void
 	{
