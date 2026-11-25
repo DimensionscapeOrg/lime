@@ -1,0 +1,105 @@
+name: Debug iOS arm64 simulator
+on: [push, workflow_dispatch]
+
+env:
+  HAXE_VERSION: 4.2.5
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
+  HXCPP_NONINTERACTIVE: 1
+
+jobs:
+
+  ios-simulator:
+    runs-on: macos-15
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Set HAXEPATH
+        run: |
+          echo "HAXEPATH=$HAXE_STD_PATH/.." >> $GITHUB_ENV
+
+      - name: Install Haxe dependencies
+        uses: ./.github/actions/install-haxelib-libraries
+        with:
+          libraries: |
+            native-desktop 1.2.1
+            native-ipc 1.0.0
+            StageWebView 1.1.0
+            wsproto 1.0.0
+            format 3.8.0
+            hxp 1.3.1
+
+      - name: Install Haxe dependencies from git
+        shell: bash
+        run: |
+          haxelib git libhxcpp https://github.com/openfl/libhxcpp --quiet
+          haxelib run libhxcpp setup
+          haxe --cwd "$(haxelib libpath libhxcpp)/tools/hxcpp" compile.hxml
+
+      - name: Prepare Lime
+        run: |
+          haxelib dev lime ${{ github.workspace }}
+          haxelib run lime setup -alias -y -nocffi -eval
+
+      - name: Rebuild Lime (iOS)
+        timeout-minutes: 120
+        run: |
+          lime rebuild ios -release -nocolor -eval
+          ls -la ndll/iPhone/
+          lipo -info ndll/iPhone/liblime.iphonesim-arm64.a
+          lipo -info ndll/iPhone/liblime.iphonesim-64.a
+          lipo -info ndll/iPhone/liblime.iphoneos-64.a
+
+      - name: Install samples
+        run: |
+          haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
+
+      - name: Build HelloWorld for the simulator (arm64 on this Mac)
+        run: |
+          uname -m; sysctl -n hw.optional.arm64
+          lime create HelloWorld -verbose -nocolor -eval
+          lime build HelloWorld ios -simulator -release -verbose -nocolor -eval > build.log 2>&1 || true
+          grep -E "xcodebuild|Haxe .* build|BUILD SUCCEEDED|BUILD FAILED|error:" build.log | head -40
+          grep -q "BUILD SUCCEEDED" build.log
+          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
+          echo "App: $app"
+          lipo -info "$app/HelloWorld"
+          lipo -info "$app/HelloWorld" | grep -q arm64
+
+      - name: Run HelloWorld in the simulator
+        run: |
+          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
+          device=$(xcrun simctl list devices available | grep -E "^ +iPhone" | head -1 | grep -oE "[0-9A-F-]{36}")
+          echo "Device: $device"
+          xcrun simctl boot "$device"
+          bundle=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$app/Info.plist")
+          xcrun simctl install "$device" "$app"
+          xcrun simctl launch "$device" "$bundle"
+          sleep 15
+          xcrun simctl spawn "$device" launchctl list | grep "$bundle"
+          xcrun simctl io "$device" screenshot screen.png
+          ls -la screen.png
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: simulator-screen
+          path: |
+            screen.png
+            build.log
+          if-no-files-found: ignore
+
+      - name: Build HelloWorld for the x86_64 simulator when asked
+        run: |
+          lime build HelloWorld ios -simulator -x86_64 -release -nocolor -eval > build64.log 2>&1 || true
+          grep -E "BUILD SUCCEEDED|BUILD FAILED|error:" build64.log | head -10
+          grep -q "BUILD SUCCEEDED" build64.log
+          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
+          lipo -info "$app/HelloWorld"
+          lipo -info "$app/HelloWorld" | grep -q x86_64
