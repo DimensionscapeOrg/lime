@@ -73,6 +73,7 @@ class AudioBuffer
 	@:noCompletion private var __srcBufferContext:Int;
 	@:noCompletion private var __srcCustom:Dynamic;
 	@:noCompletion private var __srcHowl:#if lime_howlerjs Howl #else Dynamic #end;
+	@:noCompletion private var __srcBlobURL:String;
 	@:noCompletion private var __isDisposed:Bool;
 	@:noCompletion private var __srcSound:#if flash Sound #else Dynamic #end;
 	@:noCompletion private var __srcSDLSoundBytes:#if lime_sdl_sound Bytes #else Dynamic #end;
@@ -111,6 +112,12 @@ class AudioBuffer
 
 		#if (js && html5 && lime_howlerjs)
 		__srcHowl.unload();
+
+		if (__srcBlobURL != null)
+		{
+			js.html.URL.revokeObjectURL(__srcBlobURL);
+			__srcBlobURL = null;
+		}
 		#end
 
 		__closeReader();
@@ -210,13 +217,7 @@ class AudioBuffer
 
 		#if (js && html5 && lime_howlerjs)
 		var audioBuffer = new AudioBuffer();
-
-		#if force_html5_audio
-		audioBuffer.src = new Howl({src: ["data:" + __getCodec(bytes) + ";base64," + Base64.encode(bytes)], html5: true, preload: true});
-		#else
-		audioBuffer.src = new Howl({src: ["data:" + __getCodec(bytes) + ";base64," + Base64.encode(bytes)], preload: true});
-		#end
-
+		audioBuffer.__loadBlob(bytes);
 		return audioBuffer;
 		#elseif (lime_cffi && !macro)
 		#if !cs
@@ -612,6 +613,37 @@ class AudioBuffer
 		return promise.future;
 		#end
 	}
+
+	#if (js && html5 && lime_howlerjs)
+	// Gives Howler the sound through a Blob URL, rather than a Base64 data URI the
+	// browser decodes straight back, and which Howler's Web Audio cache keeps
+	@:noCompletion private function __loadBlob(bytes:Bytes):Void
+	{
+		var codec = __getCodec(bytes);
+		var url = js.html.URL.createObjectURL(new js.html.Blob([UInt8Array.fromBytes(bytes, 0, bytes.length)], codec != null ? {type: codec} : {}));
+
+		// Howler can't read the format from a blob: URL's extension
+		var format = codec != null ? [codec.substr("audio/".length)] : null;
+
+		#if force_html5_audio
+		// The audio element can read the URL again as it plays, so it's kept until dispose ()
+		__srcBlobURL = url;
+		src = new Howl({src: [url], format: format, html5: true, preload: true});
+		#else
+		// Web Audio has decoded the sound once it has loaded, or failed to
+		var revoke = function()
+		{
+			if (url != null)
+			{
+				js.html.URL.revokeObjectURL(url);
+				url = null;
+			}
+		};
+
+		src = new Howl({src: [url], format: format, preload: true, onload: revoke, onloaderror: revoke});
+		#end
+	}
+	#end
 
 	private static function __getCodec(bytes:Bytes):String
 	{

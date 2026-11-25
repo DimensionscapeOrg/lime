@@ -1542,7 +1542,32 @@ class Image
 			return false;
 		}
 
-		__fromBase64(Base64.encode(bytes), type, onload);
+		// Through a Blob URL, rather than a Base64 data URI the browser decodes
+		// straight back
+		var url = js.html.URL.createObjectURL(new js.html.Blob([UInt8Array.fromBytes(bytes, 0, bytes.length)], {type: type}));
+		var image:JSImage = untyped #if haxe4 js.Syntax.code #else __js__ #end ('new window.Image ()');
+
+		var image_onLoaded = function(event)
+		{
+			js.html.URL.revokeObjectURL(url);
+
+			buffer = new ImageBuffer(null, image.width, image.height);
+			buffer.__srcImage = cast image;
+
+			offsetX = 0;
+			offsetY = 0;
+			width = buffer.width;
+			height = buffer.height;
+
+			if (onload != null)
+			{
+				onload(this);
+			}
+		}
+
+		image.addEventListener("load", image_onLoaded, false);
+		image.addEventListener("error", function(event) js.html.URL.revokeObjectURL(url), false);
+		image.src = url;
 		return true;
 		#elseif (lime_cffi && !macro)
 		if (bytes == null || bytes.length == 0)
