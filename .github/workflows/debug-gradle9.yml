@@ -78,8 +78,7 @@ jobs:
         run: |
           lime create HelloWorld -verbose -nocolor -eval
           cp HelloWorld/project.xml HelloWorld/project.default.xml
-          sed -i 's#</project>#<config:android gradle-version="9.4.1" gradle-plugin="9.2.1" />
-</project>#' HelloWorld/project.xml
+          sed -i 's#</project>#<config:android gradle-version="9.4.1" gradle-plugin="9.2.1" /></project>#' HelloWorld/project.xml
           grep -n "gradle" HelloWorld/project.xml
           lime build HelloWorld android -debug -nocolor -eval
           grep -n "groovy-swing\|gradle:9" HelloWorld/Export/android/bin/build.gradle
