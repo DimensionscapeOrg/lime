@@ -60,21 +60,21 @@ jobs:
         run: |
           haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
 
-      - name: Build HelloWorld for the simulator (arm64 on this Mac)
+      - name: Build SimpleImage for the simulator (arm64 on this Mac)
         run: |
           uname -m; sysctl -n hw.optional.arm64
-          lime create HelloWorld -verbose -nocolor -eval
-          lime build HelloWorld ios -simulator -release -verbose -nocolor -eval > build.log 2>&1 || true
+          lime create SimpleImage -verbose -nocolor -eval
+          lime build SimpleImage ios -simulator -release -verbose -nocolor -eval > build.log 2>&1 || true
           grep -E "xcodebuild|Haxe .* build|BUILD SUCCEEDED|BUILD FAILED|error:" build.log | head -40
           grep -q "BUILD SUCCEEDED" build.log
-          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
+          app=$(find SimpleImage/Export/ios/build -name "SimpleImage.app" -path "*iphonesimulator*" | head -1)
           echo "App: $app"
-          lipo -info "$app/HelloWorld"
-          lipo -info "$app/HelloWorld" | grep -q arm64
+          lipo -info "$app/SimpleImage"
+          lipo -info "$app/SimpleImage" | grep -q arm64
 
-      - name: Run HelloWorld in the simulator
+      - name: Run SimpleImage in the simulator
         run: |
-          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
+          app=$(find SimpleImage/Export/ios/build -name "SimpleImage.app" -path "*iphonesimulator*" | head -1)
           device=$(xcrun simctl list devices available | grep -E "^ +iPhone" | head -1 | grep -oE "[0-9A-F-]{36}")
           echo "Device: $device"
           xcrun simctl boot "$device"
@@ -95,11 +95,11 @@ jobs:
             build.log
           if-no-files-found: ignore
 
-      - name: Build HelloWorld for the x86_64 simulator when asked
+      - name: Build SimpleImage for the x86_64 simulator when asked
         run: |
-          lime build HelloWorld ios -simulator -x86_64 -release -nocolor -eval > build64.log 2>&1 || true
+          lime build SimpleImage ios -simulator -x86_64 -release -nocolor -eval > build64.log 2>&1 || true
           grep -E "BUILD SUCCEEDED|BUILD FAILED|error:" build64.log | head -10
           grep -q "BUILD SUCCEEDED" build64.log
-          app=$(find HelloWorld/Export/ios/build -name "HelloWorld.app" -path "*iphonesimulator*" | head -1)
-          lipo -info "$app/HelloWorld"
-          lipo -info "$app/HelloWorld" | grep -q x86_64
+          app=$(find SimpleImage/Export/ios/build -name "SimpleImage.app" -path "*iphonesimulator*" | head -1)
+          lipo -info "$app/SimpleImage"
+          lipo -info "$app/SimpleImage" | grep -q x86_64
