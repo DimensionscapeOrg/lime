@@ -33,8 +33,9 @@ jobs:
       - name: Build webify
         working-directory: webify
         run: |
-          stack build
+          stack build --ghc-options="-split-sections -optl-Wl,-dead_strip"
           cp "$(stack path --local-install-root)/bin/webify" ../webify-${{ matrix.arch }}
+          ls -la ../webify-${{ matrix.arch }}
           file ../webify-${{ matrix.arch }}
           otool -L ../webify-${{ matrix.arch }}
 
