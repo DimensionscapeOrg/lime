@@ -1,0 +1,120 @@
+name: Debug Apple binaries
+on: [push, workflow_dispatch]
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+jobs:
+
+  # webify from Josh Tynjala's fork of ananthakumaran/webify, which builds with current GHC
+  webify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: joshtynjala/webify
+          ref: 734dd7e84ab094eda4d8fe11bfb7378aa1a567d8
+          path: webify
+
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6.6'
+          enable-stack: true
+          stack-version: 'latest'
+
+      - name: Build webify
+        working-directory: webify
+        run: |
+          stack build
+          cp "$(stack path --local-install-root)/bin/webify" ../webify-${{ matrix.arch }}
+          file ../webify-${{ matrix.arch }}
+          otool -L ../webify-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: webify-${{ matrix.arch }}
+          path: webify-${{ matrix.arch }}
+          if-no-files-found: error
+
+  ios-deploy:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: ios-control/ios-deploy
+          ref: "1.12.2"
+          path: ios-deploy
+
+      - name: Build ios-deploy for arm64 and x86_64
+        working-directory: ios-deploy
+        run: |
+          xcodebuild -project ios-deploy.xcodeproj -target ios-deploy -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=11.0 build
+          cp build/Release/ios-deploy ../ios-deploy
+          file ../ios-deploy
+          lipo -info ../ios-deploy
+          ../ios-deploy --version
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-deploy
+          path: ios-deploy
+          if-no-files-found: error
+
+  universal:
+    needs: [webify, ios-deploy]
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: built
+
+      - name: Join webify into one binary
+        run: |
+          lipo -create built/webify-arm64/webify-arm64 built/webify-x86_64/webify-x86_64 -output webify-mac
+          chmod +x webify-mac built/ios-deploy/ios-deploy
+          cp built/ios-deploy/ios-deploy ios-deploy
+          for binary in webify-mac ios-deploy; do file $binary; lipo -info $binary; otool -L $binary; done
+
+      - name: Convert a font with the arm64 slice
+        run: |
+          mkdir fonts && cp tests/unit/assets/mono.ttf fonts/
+          ./webify-mac fonts/mono.ttf
+          ls -la fonts
+          test -s fonts/mono.woff && test -s fonts/mono.eot && test -s fonts/mono.svg
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: apple-binaries
+          path: |
+            webify-mac
+            ios-deploy
+          if-no-files-found: error
+
+  check-intel:
+    needs: universal
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: apple-binaries
+
+      - name: Run the x86_64 slices
+        run: |
+          chmod +x webify-mac ios-deploy
+          mkdir fonts && cp tests/unit/assets/mono.ttf fonts/
+          ./webify-mac fonts/mono.ttf
+          ls -la fonts
+          test -s fonts/mono.woff && test -s fonts/mono.eot && test -s fonts/mono.svg
+          ./ios-deploy --version
