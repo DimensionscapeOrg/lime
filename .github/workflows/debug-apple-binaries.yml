@@ -81,6 +81,10 @@ jobs:
 
       - name: Join webify into one binary
         run: |
+          ls -la built/webify-arm64/webify-arm64 built/webify-x86_64/webify-x86_64 built/ios-deploy/ios-deploy
+          strip built/webify-arm64/webify-arm64 built/webify-x86_64/webify-x86_64
+          strip -x built/ios-deploy/ios-deploy
+          ls -la built/webify-arm64/webify-arm64 built/webify-x86_64/webify-x86_64 built/ios-deploy/ios-deploy
           lipo -create built/webify-arm64/webify-arm64 built/webify-x86_64/webify-x86_64 -output webify-mac
           chmod +x webify-mac built/ios-deploy/ios-deploy
           cp built/ios-deploy/ios-deploy ios-deploy
