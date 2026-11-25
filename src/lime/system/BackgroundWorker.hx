@@ -88,6 +88,12 @@ class BackgroundWorker
 
 		#if (cpp || neko || (haxe4 && hl))
 		__workerThread = null;
+
+		// Nothing more is dispatched, so the worker's messages needn't be read
+		if (Application.current != null)
+		{
+			Application.current.onUpdate.remove(__update);
+		}
 		#end
 	}
 
@@ -193,36 +199,39 @@ class BackgroundWorker
 	@:noCompletion private function __update(deltaTime:Int):Void
 	{
 		#if (cpp || neko || (haxe4 && hl))
-		var message = __messageQueue.pop(false);
+		// Every message that has arrived is dispatched, as ThreadPool does, rather
+		// than one a frame
+		var queue = __messageQueue;
+		var message:Dynamic;
 
-		if (message != null)
+		while ((message = queue.pop(false)) != null)
 		{
-			if (message == MESSAGE_ERROR)
+			if (message == MESSAGE_ERROR || message == MESSAGE_COMPLETE)
 			{
 				Application.current.onUpdate.remove(__update);
+
+				// The worker adds the payload straight after, so it's waited for
+				var payload = queue.pop(true);
 
 				if (!canceled)
 				{
 					canceled = true;
-					onError.dispatch(__messageQueue.pop(false));
-				}
-			}
-			else if (message == MESSAGE_COMPLETE)
-			{
-				Application.current.onUpdate.remove(__update);
 
-				if (!canceled)
-				{
-					canceled = true;
-					onComplete.dispatch(__messageQueue.pop(false));
+					if (message == MESSAGE_ERROR)
+					{
+						onError.dispatch(payload);
+					}
+					else
+					{
+						onComplete.dispatch(payload);
+					}
 				}
+
+				break;
 			}
-			else
+			else if (!canceled)
 			{
-				if (!canceled)
-				{
-					onProgress.dispatch(message);
-				}
+				onProgress.dispatch(message);
 			}
 		}
 		#end
