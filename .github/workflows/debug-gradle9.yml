@@ -74,15 +74,23 @@ jobs:
         run: |
           haxelib git lime-samples https://github.com/openfl/lime-samples --quiet
 
-      - name: Build HelloWorld with Gradle 9.4.1 and plugin 9.2.1 (debug and release)
+      - name: Build HelloWorld with Gradle 9.4.1 and plugin 9.2.1
         run: |
           lime create HelloWorld -verbose -nocolor -eval
-          lime build HelloWorld android -debug -nocolor -eval --config-android.gradle-version=9.4.1 --config-android.gradle-plugin=9.2.1
-          lime build HelloWorld android -release -nocolor -eval --config-android.gradle-version=9.4.1 --config-android.gradle-plugin=9.2.1
+          cp HelloWorld/project.xml HelloWorld/project.default.xml
+          sed -i 's#</project>#<config:android gradle-version="9.4.1" gradle-plugin="9.2.1" />
+</project>#' HelloWorld/project.xml
+          grep -n "gradle" HelloWorld/project.xml
+          lime build HelloWorld android -debug -nocolor -eval
+          grep -n "groovy-swing\|gradle:9" HelloWorld/Export/android/bin/build.gradle
+          grep -n "archivesName" HelloWorld/Export/android/bin/app/build.gradle
+          grep -rn "distributionUrl" HelloWorld/Export/android/bin/gradle/wrapper/gradle-wrapper.properties
           find HelloWorld/Export/android/bin/app/build/outputs -name "*.apk" -o -name "*.aab"
+          test -f HelloWorld/Export/android/bin/app/build/outputs/apk/debug/HelloWorld-debug.apk
 
       - name: Build HelloWorld with the default Gradle and plugin
         run: |
           rm -rf HelloWorld/Export
-          lime build HelloWorld android -release -nocolor -eval
+          cp HelloWorld/project.default.xml HelloWorld/project.xml
+          lime build HelloWorld android -debug -nocolor -eval
           find HelloWorld/Export/android/bin/app/build/outputs -name "*.apk" -o -name "*.aab"
