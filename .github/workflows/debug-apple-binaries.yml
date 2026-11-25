@@ -57,15 +57,16 @@ jobs:
         working-directory: ios-deploy
         run: |
           xcodebuild -project ios-deploy.xcodeproj -target ios-deploy -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=11.0 build
-          cp build/Release/ios-deploy ../ios-deploy
-          file ../ios-deploy
-          lipo -info ../ios-deploy
-          ../ios-deploy --version
+          mkdir -p ../out
+          cp build/Release/ios-deploy ../out/ios-deploy
+          file ../out/ios-deploy
+          lipo -info ../out/ios-deploy
+          ../out/ios-deploy --version
 
       - uses: actions/upload-artifact@v7
         with:
           name: ios-deploy
-          path: ios-deploy
+          path: out/ios-deploy
           if-no-files-found: error
 
   universal:
