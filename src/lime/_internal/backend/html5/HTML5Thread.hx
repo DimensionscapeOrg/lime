@@ -104,11 +104,36 @@ class HTML5Thread
 	}
 
 	#if !macro
-	private static inline function zeroDelay():Promise<Dynamic>
+	private static var __yieldChannel:MessageChannel;
+	private static var __yieldResolves:List<Dynamic->Void>;
+
+	// Waits for the thread's other tasks, such as its messages, to run. A message
+	// to itself does that without the minimum delay browsers give a repeated
+	// setTimeout(0), which would let a job's work function run at most about
+	// 250 times a second
+	private static function zeroDelay():Promise<Dynamic>
 	{
 		return new Promise<Dynamic>(function(resolve, _):Void
 		{
-			js.Lib.global.setTimeout(resolve);
+			if (__yieldChannel == null)
+			{
+				if (Reflect.field(js.Lib.global, "MessageChannel") == null)
+				{
+					js.Lib.global.setTimeout(resolve);
+					return;
+				}
+
+				__yieldResolves = new List();
+				__yieldChannel = new MessageChannel();
+				__yieldChannel.port1.onmessage = function(_)
+				{
+					var next = __yieldResolves.pop();
+					if (next != null) next(null);
+				};
+			}
+
+			__yieldResolves.add(resolve);
+			__yieldChannel.port2.postMessage(null);
 		});
 	}
 	#end
