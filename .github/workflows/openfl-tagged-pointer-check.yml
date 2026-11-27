@@ -64,7 +64,7 @@ jobs:
         run: |
           haxelib --always git openfl https://github.com/openfl/openfl develop
           haxelib --always install actuate
-          git clone --depth 1 --branch develop https://github.com/openfl/openfl-samples samples
+          git clone --depth 1 https://github.com/openfl/openfl-samples samples
           git -C "$(haxelib path openfl | head -1)/.." log -1 --format='OpenFL %h %s' || true
       - name: Build Pirate Pig
         working-directory: samples/demos/PiratePig
