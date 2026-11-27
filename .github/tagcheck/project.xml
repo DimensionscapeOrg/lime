@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+	<meta title="TagCheck VARIANT" package="org.openfl.lime.tagcheck.VARIANT" version="1.0.0" company="Lime" />
+	<app main="Main" path="Export" file="TagCheck" />
+	<source path="Source" />
+	<haxelib name="lime" />
+	<window fullscreen="true" />
+	<!-- Turn Android's heap pointer tagging back on, which Lime's template turns off -->
+	<config:android>
+		<application android:allowNativeHeapPointerTagging="true" />
+	</config:android>
+</project>
