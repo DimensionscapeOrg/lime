@@ -8,6 +8,8 @@
 	<window width="0" height="0" fps="60" background="#FF00FF" orientation="landscape" />
 
 	<source path="Source" />
+	<!-- One asset, as a project without any fails to build with Xcode 27 on its own account -->
+	<assets path="Assets" />
 	<haxelib name="lime" />
 
 </project>
