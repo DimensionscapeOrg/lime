@@ -20,7 +20,7 @@ if [ -z "$APP" ]; then exit 1; fi
 	-c "Add :CFBundleURLTypes:0 dict" \
 	-c "Add :CFBundleURLTypes:0:CFBundleURLName string $BUNDLE" \
 	-c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" \
-	-c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string scenecheck" \
+	-c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string scenecheck" 	-c "Add :LSApplicationQueriesSchemes array" 	-c "Add :LSApplicationQueriesSchemes:0 string scenecheck" \
 	"$APP/Info.plist"
 codesign --force --sign - --timestamp=none "$APP" 2>&1 | tee -a "$OUT/steps.txt"
 plutil -p "$APP/Info.plist" > "$OUT/Info.plist.txt"
@@ -61,15 +61,33 @@ for round in 1 2; do
 	sleep 4; shot "foreground-$round"
 done
 
-step "warm URL"
-xcrun simctl openurl "$UDID" scenecheck://warm 2>&1 | tee -a "$OUT/steps.txt"
-sleep 4
+# simctl openurl asks "Open in SceneCheck?", which nothing here can tap, so uiopen in the simulator
+# is tried first, and then Return is pressed in the Simulator for the prompt's Open button
+accept() {
+	osascript -e 'tell application "Simulator" to activate' -e 'delay 1' -e 'tell application "System Events" to keystroke return' 2>&1 | tee -a "$OUT/steps.txt"
+}
 
-step "cold URL"
+step "warm URL, uiopen"
+xcrun simctl spawn "$UDID" uiopen scenecheck://warm-uiopen 2>&1 | tee -a "$OUT/steps.txt"
+sleep 4; shot warm-uiopen
+step "warm URL, openurl"
+xcrun simctl openurl "$UDID" scenecheck://warm-openurl 2>&1 | tee -a "$OUT/steps.txt"
+sleep 2; shot warm-openurl-prompt
+accept
+sleep 4; shot warm-openurl
+
+step "cold URL, uiopen"
 xcrun simctl terminate "$UDID" "$BUNDLE" 2>&1 | tee -a "$OUT/steps.txt"
 sleep 2
-xcrun simctl openurl "$UDID" scenecheck://cold 2>&1 | tee -a "$OUT/steps.txt"
-sleep 10; shot cold
+xcrun simctl spawn "$UDID" uiopen scenecheck://cold-uiopen 2>&1 | tee -a "$OUT/steps.txt"
+sleep 10; shot cold-uiopen
+step "cold URL, openurl"
+xcrun simctl terminate "$UDID" "$BUNDLE" 2>&1 | tee -a "$OUT/steps.txt"
+sleep 2
+xcrun simctl openurl "$UDID" scenecheck://cold-openurl 2>&1 | tee -a "$OUT/steps.txt"
+sleep 2; shot cold-openurl-prompt
+accept
+sleep 10; shot cold-openurl
 
 cp "$LOG" "$OUT/scenecheck.log" 2>/dev/null || echo "(no log)" > "$OUT/scenecheck.log"
 xcrun simctl spawn "$UDID" log show --last 10m --style compact --predicate 'process == "SceneCheck"' > "$OUT/system-log.txt" 2>&1 || true

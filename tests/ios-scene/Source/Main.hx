@@ -36,6 +36,12 @@ class Main extends Application
 		frames++;
 		if (frames == 1 || frames == 60) log("FRAME " + frames + " " + window.width + "x" + window.height);
 
+		if (frames == 120)
+		{
+			log("OPEN scenecheck://self");
+			System.openURL("scenecheck://self");
+		}
+
 		switch (context.type)
 		{
 			case OPENGL, OPENGLES, WEBGL:

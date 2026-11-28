@@ -9,9 +9,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: develop
-            repository: openfl/lime
-            ref: 18207792972b9b7a9b84cc46b4fe933217261503
           - name: scene
             repository: DimensionscapeOrg/lime
             ref: probe/ios-scene-xcode27
