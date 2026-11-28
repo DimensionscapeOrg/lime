@@ -61,33 +61,21 @@ for round in 1 2; do
 	sleep 4; shot "foreground-$round"
 done
 
-# simctl openurl asks "Open in SceneCheck?", which nothing here can tap, so uiopen in the simulator
-# is tried first, and then Return is pressed in the Simulator for the prompt's Open button
-accept() {
-	osascript -e 'tell application "Simulator" to activate' -e 'delay 1' -e 'tell application "System Events" to keystroke return' 2>&1 | tee -a "$OUT/steps.txt"
-}
+# simctl openurl asks "Open in SceneCheck?", which nothing here can tap. An app that opens another
+# app's URL asks no one, so SceneHelper opens SceneCheck with a URL while it isn't running
+HELPER_BUNDLE=org.openfl.lime.scenehelper
+HELPER=$(find ../ios-scene-helper/Export -type d -name 'SceneHelper.app' -path '*iphonesimulator*' | head -1)
+step "helper: $HELPER"
+/usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes array" -c "Add :LSApplicationQueriesSchemes:0 string scenecheck" "$HELPER/Info.plist"
+codesign --force --sign - --timestamp=none "$HELPER" 2>&1 | tee -a "$OUT/steps.txt"
+xcrun simctl install "$UDID" "$HELPER" 2>&1 | tee -a "$OUT/steps.txt"
 
-step "warm URL, uiopen"
-xcrun simctl spawn "$UDID" uiopen scenecheck://warm-uiopen 2>&1 | tee -a "$OUT/steps.txt"
-sleep 4; shot warm-uiopen
-step "warm URL, openurl"
-xcrun simctl openurl "$UDID" scenecheck://warm-openurl 2>&1 | tee -a "$OUT/steps.txt"
-sleep 2; shot warm-openurl-prompt
-accept
-sleep 4; shot warm-openurl
-
-step "cold URL, uiopen"
+step "cold URL, from SceneHelper"
 xcrun simctl terminate "$UDID" "$BUNDLE" 2>&1 | tee -a "$OUT/steps.txt"
 sleep 2
-xcrun simctl spawn "$UDID" uiopen scenecheck://cold-uiopen 2>&1 | tee -a "$OUT/steps.txt"
-sleep 10; shot cold-uiopen
-step "cold URL, openurl"
-xcrun simctl terminate "$UDID" "$BUNDLE" 2>&1 | tee -a "$OUT/steps.txt"
-sleep 2
-xcrun simctl openurl "$UDID" scenecheck://cold-openurl 2>&1 | tee -a "$OUT/steps.txt"
-sleep 2; shot cold-openurl-prompt
-accept
-sleep 10; shot cold-openurl
+xcrun simctl launch --stdout="$OUT/helper-stdout.txt" "$UDID" "$HELPER_BUNDLE" 2>&1 | tee -a "$OUT/steps.txt"
+sleep 3; shot cold-helper-3s
+sleep 9; shot cold-helper-12s
 
 cp "$LOG" "$OUT/scenecheck.log" 2>/dev/null || echo "(no log)" > "$OUT/scenecheck.log"
 xcrun simctl spawn "$UDID" log show --last 10m --style compact --predicate 'process == "SceneCheck"' > "$OUT/system-log.txt" 2>&1 || true

@@ -79,6 +79,11 @@ jobs:
         run: |
           lime build ios -simulator -release -verbose -nocolor -eval
 
+      - name: Build SceneHelper for the simulator
+        working-directory: probe/tests/ios-scene-helper
+        run: |
+          lime build ios -simulator -release -verbose -nocolor -eval
+
       - name: Run SceneCheck on the newest iOS simulator
         working-directory: probe/tests/ios-scene
         run: bash run.sh
