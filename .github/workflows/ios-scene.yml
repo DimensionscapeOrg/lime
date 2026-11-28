@@ -1,0 +1,93 @@
+name: iOS scene check
+on:
+  push:
+    branches: [probe/ios-scene-xcode27]
+
+jobs:
+  scene:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: develop
+            repository: openfl/lime
+            ref: 18207792972b9b7a9b84cc46b4fe933217261503
+          - name: scene
+            repository: DimensionscapeOrg/lime
+            ref: probe/ios-scene-xcode27
+    name: ${{ matrix.name }}
+    runs-on: xcode-27
+    timeout-minutes: 150
+    env:
+      HAXE_VERSION: 4.2.5
+      HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
+      HXCPP_NONINTERACTIVE: 1
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          path: probe
+
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: lime
+          submodules: true
+
+      - name: Xcode, SDKs and simulator runtimes
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i ios
+          xcrun simctl list runtimes
+
+      - uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Set HAXEPATH
+        run: |
+          echo "HAXEPATH=$HAXE_STD_PATH/.." >> $GITHUB_ENV
+
+      - name: Install Haxe dependencies
+        uses: ./lime/.github/actions/install-haxelib-libraries
+        with:
+          libraries: |
+            native-desktop 1.2.2
+            native-ipc 1.0.0
+            StageWebView 1.1.1
+            wsproto 1.1.2
+            format 3.8.0
+            hxp 1.3.1
+            libhxcpp 6.0.0
+
+      - name: Set up libhxcpp
+        shell: bash
+        run: haxelib run libhxcpp setup
+
+      - name: Prepare Lime
+        run: |
+          haxelib dev lime ${{ github.workspace }}/lime
+          haxelib run lime setup -alias -y -nocffi -eval
+
+      - name: Rebuild Lime (iOS)
+        timeout-minutes: 90
+        working-directory: lime
+        run: |
+          lime rebuild ios -clean -release -verbose -nocolor -eval
+
+      - name: Build SceneCheck for the simulator
+        working-directory: probe/tests/ios-scene
+        run: |
+          lime build ios -simulator -release -verbose -nocolor -eval
+
+      - name: Run SceneCheck on the newest iOS simulator
+        working-directory: probe/tests/ios-scene
+        run: bash run.sh
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-scene-${{ matrix.name }}
+          path: probe/tests/ios-scene/out/

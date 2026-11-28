@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+
+	<meta title="SceneCheck" package="org.openfl.lime.scenecheck" version="1.0.0" company="OpenFL" />
+	<app main="Main" path="Export" file="SceneCheck" />
+
+	<!-- Landscape only, so coming back from the background laid out for portrait (#2111) shows in the size -->
+	<window width="0" height="0" fps="60" background="#FF00FF" orientation="landscape" />
+
+	<source path="Source" />
+	<haxelib name="lime" />
+
+</project>
